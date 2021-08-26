@@ -1,0 +1,190 @@
+import os
+import torch as t
+import numpy as np
+import cv2
+import matplotlib.pyplot as plt
+import skimage
+from skimage import color
+
+
+def rotate_bound(image, angle):
+    # grab the dimensions of the image and then determine the
+    # center
+    (h, w) = image.shape[:2]
+    (cX, cY) = (w // 2, h // 2)
+
+    # grab the rotation matrix (applying the negative of the
+    # angle to rotate clockwise), then grab the sine and cosine
+    # (i.e., the rotation components of the matrix)
+    M = cv2.getRotationMatrix2D((cX, cY), -angle, 1.0)
+    cos = np.abs(M[0, 0])
+    sin = np.abs(M[0, 1])
+
+    # compute the new bounding dimensions of the image
+    nW = int((h * sin) + (w * cos))
+    nH = int((h * cos) + (w * sin))
+
+    # adjust the rotation matrix to take into account translation
+    M[0, 2] += (nW / 2) - cX
+    M[1, 2] += (nH / 2) - cY
+
+    # perform the actual rotation and return the image
+    return cv2.warpAffine(image, M, (nW, nH))
+
+
+from ctypes import *  # cdll, c_int
+
+dataset1 = os.listdir("/home/wangbin/桌面/2021.1.8/10.24_zdhxb/benwensuanfa_chuanxing/Intermediate_process/JPG_UP")
+dataset2 = os.listdir("/home/wangbin/桌面/2021.1.8/10.24_zdhxb/benwensuanfa_chuanxing/Intermediate_process/JPG_DOWN")
+dataset = dataset1 + dataset2
+print(dataset)
+print(len(dataset))
+dataset = np.sort(dataset)
+name_list1 = None
+
+
+class callsubBuf(object):
+    def __init__(self):
+        self.obj = lib.subBuf_new()
+
+    def callcursubBuf(self, data, num, outData):
+        lib.subBuf_sub(self.obj, data, num, outData)
+
+    def call_call(self, data1, x, y, data2, data3):
+        lib.call_call_call(self.obj, data1, x, y, data2, data3)
+
+
+flag = 0
+pos_x = []
+pos_y = []
+for d in range(len(dataset)):
+    flag = 0
+    lib = cdll.LoadLibrary('/media/wangbin/E/7.11/123/libmathBuf.so')
+    print(d)
+    name = dataset[d]
+    # print(name)
+    name_list = name.split(".")[0]
+    print(name_list)
+    if d > 1:
+        name_list1 = dataset[d - 1].split(".")[0]
+    # target = int(name_list[0])
+    if name_list == name_list1:
+        img = cv2.imread(
+            '/home/wangbin/桌面/2021.1.8/10.24_zdhxb/benwensuanfa_chuanxing/Intermediate_process/JPG_UP/{}.png'.format(
+                name_list))
+    else:
+        img = cv2.imread(
+            '/home/wangbin/桌面/2021.1.8/10.24_zdhxb/benwensuanfa_chuanxing/Intermediate_process/JPG_DOWN/{}.png'.format(
+                name_list))
+
+    # img=rotate_bound(img,j)
+    L, a, b = cv2.split(img)
+    # cv2.imread 读取图片三通道对换
+    img1 = cv2.merge([b, a, L])
+
+    img = skimage.color.rgb2lab(img)
+
+    L, a, b = cv2.split(img)
+
+    aa = np.ones((a.shape[0], a.shape[1]))
+    i1 = np.inf
+    for i in range(0, a.shape[0]):
+        for j in range(0, a.shape[1]):
+            if (a[i][j] >= 10):
+                aa[i][j] = 0
+                i1 = min(i, i1)
+    print(i1)
+
+    for k in range(30):
+        print("***_{}_{}".format(d, k))
+        # print(aa)
+        # bb = np.ones((a.shape[0] + 100, a.shape[1] + 100))
+        bb = np.ones((1100, 1100, 3)) * 255
+        bb1 = np.ones((1100, 1100))
+        for i in range(0, a.shape[0]):
+            for j in range(0, a.shape[1]):
+                if aa[i][j] == 0:
+                    if j + 50 + k * 2 < 1100 and i - i1 + 50 + k * 2 < 1100:
+                        bb[i - i1 + 50 + k * 2][j + 50 + k * 2][1] = img1[i][j][1]
+                        bb[i - i1 + 50 + k * 2][j + 50 + k * 2][2] = img1[i][j][0]
+                        bb[i - i1 + 50 + k * 2][j + 50 + k * 2][0] = img1[i][j][2]
+                        bb1[i - i1 + 50 + k * 2][j + 50 + k * 2] = 0
+                    else:
+                        flag = 1
+                        break
+            if flag == 1:
+                break
+        if flag == 1:
+            break
+
+        data = bb
+        # plt.imshow(data)
+        # plt.pause(0.01)
+
+        cv2.imwrite(
+            "/home/wangbin/.config/JetBrains/PyCharmCE2020.3/scratches/picture_presolve/picture4/{}_{}_{}.png".format(
+                name_list, d, k), data)
+
+        #         # data=loadImage2("/media/wangbin/G/chapter07-AnimeGAN/chapter07-AnimeGAN/picture_presolve/picture/{}_{}.png".format(name_list,d))
+        x, y = bb1.shape
+        # print(x,y)
+        # l = []
+        s = 0
+        data1 = (c_int32 * 121000001)()
+        data2 = (c_int32 * 121000001)()
+        data3 = (c_int32 * 121000001)()
+        for m in range(0, x):
+            for i in bb1[m]:
+                data1[s] = c_int32(int(i))
+                s = s + 1
+        # print(len(l))
+        # s = len(l)
+        # l1 = []
+        # for i in range(0, s):
+        #     l1.append(c_int32(int(l[i])))
+        #
+        #
+        #
+        # for i in range(len(l)):
+        #     data1[i] = l1[i]
+
+        f1 = callsubBuf()
+        f1.call_call(data1, x, y, data2, data3)
+
+        # print(data2[0])
+
+        # print(data2[1:data2[0]+1])
+        # print(data3[1:data3[0]+1])
+
+        pos_x += data2[1:data2[0] + 1]
+        pos_y += data3[1:data3[0] + 1]
+        # print(len(pos_x), len(pos_y))
+        # print(pos_x, "\n", pos_y)
+
+        # with open("pos_file.txt","a") as f:
+        #     f.write(str(l2[:]))
+        #     f.write(".")
+dst1 = os.path.join("./pos_x.txt")
+dst2 = os.path.join("./pos_y.txt")
+np.savetxt(dst1, pos_x, fmt='%d', delimiter=',', newline='.')
+np.savetxt(dst2, pos_y, fmt="%d", delimiter=",", newline=".")
+
+# data3=(c_int32 * len(data2[:data2[0]]))()
+#
+# f = callsubBuf()
+# f.callcursubBuf(data2, data2[0], data3)
+# print(data3[:])
+
+# import os
+# dataset1 = os.listdir("/media/wangbin/G/chapter07-AnimeGAN/chapter07-AnimeGAN/picture_presolve/picture")
+# print(dataset1)
+# import cv2
+# import skimage
+# from skimage import color
+# for _ in range(len(dataset1)):
+#     img=cv2.imread("/media/wangbin/G/chapter07-AnimeGAN/chapter07-AnimeGAN/picture_presolve/picture/{}".format(dataset1[_]))
+#     import matplotlib.pyplot as plt
+#     print(type(img),img.dtype)
+#     a,b,c=cv2.split(img)
+#     plt.imshow(b)
+#     plt.pause(0.01)
